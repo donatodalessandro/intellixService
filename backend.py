@@ -1,4 +1,6 @@
 import os
+import random
+import string
 import time
 import uuid
 from bson import json_util
@@ -20,14 +22,14 @@ from mongo_class import creazioneDB
 mqttBroker = "test.mosquitto.org"
 app = Flask(__name__)
 
-intelx = intelx('3f2ef7d9-d6a2-4ce6-991e-254e2ae0d090')  # possibile ciclo con varie keys
+intelx = intelx('bb54ee22-7c93-4d94-ad58-71d39a8dca32')  # possibile ciclo con varie keys
 
 def research_on_intelix(query,fromDate,toDate):
 
     format = "%Y-%m-%d"
 
     results = intelx.search(query,datefrom=fromDate.strftime(format),dateto=toDate.strftime(format))     #aggiungere dei parametri
-    keys = ['query', 'name', 'date', 'typeh', 'bucketh']
+    keys = ['_id','query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []
     jsonDict = {}
@@ -45,6 +47,8 @@ def research_on_intelix(query,fromDate,toDate):
                 elif key == 'date':
                     datetime_object = parser.parse(record[key])
                     dizionario[key] = datetime_object.timestamp()
+                elif key == '_id':
+                    dizionario['_id'] = uuid.uuid4().hex
                 else:
                     dizionario[key] = record[key]
             #print(dizionario)
@@ -72,6 +76,58 @@ def research_on_intelix(query,fromDate,toDate):
         error = {'Error': 'Internal Server Error'}
         return error, 500
 
+def research_on_intelix_query(query):
+
+    format = "%Y-%m-%d"
+
+    results = intelx.search(query)     #aggiungere dei parametri
+    keys = ['_id','query', 'name', 'date', 'typeh', 'bucketh']
+
+    nested = []
+    jsonDict = {}
+    #queryNested = []
+    #queryDict = {}
+
+    datetime_str = "2022-12-13T00:24:30.98013Z"
+
+    try:
+        for record in results["records"]:
+            dizionario = {}
+            for key in keys:
+                if key == 'query':
+                    dizionario['query'] = query
+                elif key == 'date':
+                    datetime_object = parser.parse(record[key])
+                    dizionario[key] = datetime_object.timestamp()
+                elif key == '_id':
+                    dizionario['_id'] = uuid.uuid4().hex
+                else:
+                    dizionario[key] = record[key]
+            #print(dizionario)
+            nested.append(dizionario)
+            jsonDict[record["name"]] = dizionario
+
+        print("******************************")
+        #print(nested)
+        jstr = parse_json(jsonDict)
+        #json.dumps(jsonDict, indent=4)
+        #print(nested)
+        #queryDict["query"] = domain
+        #queryNested.append(queryDict)
+        #queryDb(queryNested)
+
+        dict_response = {}
+        dict_response["id"]= uuid.uuid4()
+        dict_response["query"] = query
+        dict_response["timestamp"] = time.time()
+        dict_response["results"] = nested
+        #creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
+        return dict_response           #SearchScheduleResponseDTO
+
+    except Exception as e:
+        error = {'Error': 'Internal Server Error'}
+        return error, 500
+
 '''
 data = {"system_id": ,
         "timestamp": ,
@@ -86,38 +142,47 @@ def parse_json(data):
 def tick():
     print('Tick! The time is: %s' % datetime.now())
 
-def research_alert(query):
+def research_scheduler(query):
 
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     # Creazione del database   --- Cambiare nome alla collezione
     database = connessione["IntelX"]
     collection_results = database["results"]
-    collection_alert = database["schedulers"]
+    collection_schedulers = database["schedulers"]
 
     # Limitare i risultati da estrarre
     criterio = {"query": query}
-    selezione = collection_alert.find(criterio)
+    selezione = collection_schedulers.find(criterio)
     jstr = parse_json(selezione)
 
+
     if jstr != []:
-        return "Alert già presente"
+
+        dict_response = {}
+        dict_response["id"] = uuid.uuid4()
+        dict_response["query"] = query
+        dict_response["timestamp"] = time.time()
+        dict_response["results"] = research_on_db(query)
+
+        return dict_response
     else:
-        create_alert(query)
+        return create_scheduler(query)
 
-def create_alert(query):
+def create_scheduler(query):
 
-    add_alert_db(query)
-    publish_topic(query)
+    return add_scheduler_to_db(query)
+    #publish_topic(query)
 
-def add_alert_db(query):
+def add_scheduler_to_db(query):
 
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
     # Creazione del database
     database = connessione["IntelX"]
-    #collection_results = database["results"]
-    nuovacollection = database["alerts"]
+    results = database["results"]
+    schedulers = database["schedulers"]
 
+    result_dict = research_on_intelix_query(query)
     query_list = []
 
     '''
@@ -127,9 +192,15 @@ def add_alert_db(query):
             if elem['query'] == selezione['query']:
                 lista.remove(elem)
     '''
+    dizionario = {}
+    dizionario["query"] = query
+    query_list.append(dizionario)
+    schedulers.insert_many(query_list)
+    #print(result_dict["results"])
+    results.insert_many(result_dict["results"])
 
-    query_list.append(query)
-    nuovacollection.insert_many(query_list)
+    return result_dict
+
 
 def publish_topic(topic):
     print("metodo publish")
@@ -204,6 +275,7 @@ def research():
     return stampaHTMLquery(query, maxResults)
 '''
 def research_on_db(query):
+
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     # Creazione del database
@@ -218,6 +290,27 @@ def research_on_db(query):
 
     jstr = parse_json(selezione)        #return DTO
 
-    print(jstr)
     return jstr
+
+
+def create_db():
+
+    dict = research_on_intelix()
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # Creazione del database
+    database = connessione["IntelX"]
+    nuovacollection = database["results"]
+
+    results = {}
+
+    # Limitare i risultati da estrarre
+    criterio = {"query": query}
+    selezione = nuovacollection.find(criterio)
+
+
+    jstr = parse_json(selezione)
+
+    return jsonify(jstr)
+
 

@@ -1,10 +1,11 @@
 from intelxapi import intelx
 from datetime import datetime
 from flask import Flask, request
-from backend import research_alert, research_on_intelix, research_on_db
-from models import SearchCommand, SeachScheduleResponse
+from backend import research_scheduler, research_on_intelix, research_on_db
+from models import SearchCommand, SeachScheduleResponse, ScheduleCommand
 from mongo_class import drop_collection
-
+import time
+import uuid
 
 mqttBroker = "test.mosquitto.org"
 app = Flask(__name__)
@@ -40,7 +41,14 @@ def researchByDomain():
     results = research_on_db(query)
 
     if results != []:
-        return results  # come DTO
+        print("sono qui")
+        dict_response = {}
+        dict_response["id"] = uuid.uuid4().hex
+        dict_response["query"] = query
+        dict_response["timestamp"] = time.time()
+        dict_response["results"] = results
+
+        return dict_response
     else:
         return research_on_intelix(query,fromDate,toDate)
 
@@ -91,13 +99,16 @@ def schedulers():
     """
     # estraiamo il parametro dal body
 
-    searchCommand = SearchCommand(request.json)
-    query = searchCommand.query
+    scheduleCommand = ScheduleCommand(request.json)
+    query = scheduleCommand.query
 
     if request.method == 'POST':
-        return research_alert(query)
+        return research_scheduler(query)
     else:
         return drop_collection(query)
+
+
+
 '''
     #cosa ci passano?
     #query = request.form.args['query']
@@ -129,14 +140,3 @@ if __name__ == '__main__':
         scheduler.shutdown()
         print("-----------------Debug message: server stopped")
 '''
-import random
-import string
-
-def get_random_string(length):
-    # With combination of lower and upper case
-    result_str = ''.join(random.choice(string.ascii_letters) for i in range(length))
-    # print random string
-    print(result_str)
-
-# string of length 8
-get_random_string(8)
