@@ -1,0 +1,223 @@
+import os
+import time
+import uuid
+from bson import json_util
+from intelxapi import intelx
+from flask import Flask, jsonify, request
+import json
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+from paho.mqtt.client import Client
+from dateutil import parser
+
+# Importazione del modulo di PyMongo
+import pymongo
+
+#mqttBroker ="mqtt.eclipseprojects.io"
+from models import SeachScheduleResponse
+from mongo_class import creazioneDB
+
+mqttBroker = "test.mosquitto.org"
+app = Flask(__name__)
+
+intelx = intelx('3f2ef7d9-d6a2-4ce6-991e-254e2ae0d090')  # possibile ciclo con varie keys
+
+def research_on_intelix(query,fromDate,toDate):
+
+    format = "%Y-%m-%d"
+
+    results = intelx.search(query,datefrom=fromDate.strftime(format),dateto=toDate.strftime(format))     #aggiungere dei parametri
+    keys = ['query', 'name', 'date', 'typeh', 'bucketh']
+
+    nested = []
+    jsonDict = {}
+    #queryNested = []
+    #queryDict = {}
+
+    datetime_str = "2022-12-13T00:24:30.98013Z"
+
+    try:
+        for record in results["records"]:
+            dizionario = {}
+            for key in keys:
+                if key == 'query':
+                    dizionario['query'] = query
+                elif key == 'date':
+                    datetime_object = parser.parse(record[key])
+                    dizionario[key] = datetime_object.timestamp()
+                else:
+                    dizionario[key] = record[key]
+            #print(dizionario)
+            nested.append(dizionario)
+            jsonDict[record["name"]] = dizionario
+
+        print("******************************")
+        #print(nested)
+        jstr = parse_json(jsonDict)
+        #json.dumps(jsonDict, indent=4)
+        print(nested)
+        #queryDict["query"] = domain
+        #queryNested.append(queryDict)
+        #queryDb(queryNested)
+
+        dict_response = {}
+        dict_response["id"]= uuid.uuid4()
+        dict_response["query"] = query
+        dict_response["timestamp"] = time.time()
+        dict_response["results"] = nested
+        #creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
+        return dict_response, 200           #SearchScheduleResponseDTO
+
+    except Exception as e:
+        error = {'Error': 'Internal Server Error'}
+        return error, 500
+
+'''
+data = {"system_id": ,
+        "timestamp": ,
+        "query": domain,
+        "result": nested
+        }
+'''
+
+def parse_json(data):
+    return json.loads(json_util.dumps(data))
+
+def tick():
+    print('Tick! The time is: %s' % datetime.now())
+
+def research_alert(query):
+
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # Creazione del database   --- Cambiare nome alla collezione
+    database = connessione["IntelX"]
+    collection_results = database["results"]
+    collection_alert = database["schedulers"]
+
+    # Limitare i risultati da estrarre
+    criterio = {"query": query}
+    selezione = collection_alert.find(criterio)
+    jstr = parse_json(selezione)
+
+    if jstr != []:
+        return "Alert già presente"
+    else:
+        create_alert(query)
+
+def create_alert(query):
+
+    add_alert_db(query)
+    publish_topic(query)
+
+def add_alert_db(query):
+
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    # Creazione del database
+    database = connessione["IntelX"]
+    #collection_results = database["results"]
+    nuovacollection = database["alerts"]
+
+    query_list = []
+
+    '''
+    # Estrazione dei documenti di una collection
+    for selezione in nuovacollection.find():
+        for elem in lista:
+            if elem['query'] == selezione['query']:
+                lista.remove(elem)
+    '''
+
+    query_list.append(query)
+    nuovacollection.insert_many(query_list)
+
+def publish_topic(topic):
+    print("metodo publish")
+    async_scheduler(topic)
+
+def async_scheduler(query):
+    print("metodo async_scheduler")
+    research_new_dump(query)
+    '''
+    try:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(research_new_dump(query), 'interval', seconds=15)
+        scheduler.start()
+        print('Press Ctrl+{0} to exit'.format('Break' if os.name == 'nt' else 'C'))
+        while True:
+            time.sleep(2)
+    except (KeyboardInterrupt, SystemExit):
+        # Not strictly necessary if daemonic mode is enabled but should be done if possible
+        scheduler.shutdown()
+        print("-----------------Debug message: server stopped")
+    '''
+
+def research_new_dump(query):
+
+    print("metodo research dumps")
+
+    dumps, status_code = stampaHTML(query["query"])
+
+    print(dumps)
+    print(status_code)
+
+    if status_code == 200:
+        message = "Sono presenti nuovi dumps"
+        send_dumps(message)
+        print("funonzia")
+    else:
+        message = "Non sono presenti nuovi dumps"
+        send_dumps(message)
+
+def send_dumps(result_query):
+
+    def on_publish(client, userdata, mid):
+        print("Messaggio pubblicato")
+
+    client = Client("Publisher_test")
+    client.on_publish = on_publish
+    client.connect(mqttBroker)
+    client.loop_start()
+    client.publish(topic="test", payload=result_query)
+    client.loop_stop()
+    client.disconnect()
+
+    json_response = {"Valore" : "Funziona"}
+    print("send dumps")
+    return jsonify(json_response)
+
+
+'''
+@app.get('/unisannio/DWM/intelx/searches')
+def research():
+
+    """
+        Endpoint Rest per la ricerca di un dominio e di un numero n di risultati medianti query param
+
+        :return: Lista contenete i dump in formato json
+
+    """
+
+    query = request.args['query']
+    maxResults = int(request.args['maxresults'])
+
+    return stampaHTMLquery(query, maxResults)
+'''
+def research_on_db(query):
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # Creazione del database
+    database = connessione["IntelX"]
+    nuovacollection = database["results"]
+
+    results = {}
+
+    # Limitare i risultati da estrarre
+    criterio = {"query": query}
+    selezione = nuovacollection.find(criterio)
+
+    jstr = parse_json(selezione)        #return DTO
+
+    print(jstr)
+    return jstr
+
