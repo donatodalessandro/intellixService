@@ -1,8 +1,11 @@
 import os
 import random
 import string
+import re
 import time
 import uuid
+from itertools import count
+
 from bson import json_util
 from intelxapi import intelx
 from flask import Flask, jsonify, request
@@ -16,26 +19,34 @@ from dateutil import parser
 import pymongo
 
 # mqttBroker ="mqtt.eclipseprojects.io"
+import library_api
 from models import SeachScheduleResponse
 from mongo_class import creazioneDB
 
 mqttBroker = "test.mosquitto.org"
 app = Flask(__name__)
 
-intelx = intelx('bb54ee22-7c93-4d94-ad58-71d39a8dca32')  # possibile ciclo con varie keys
+intelx = intelx('6dc578ec-490b-49d5-8717-6379a2118895')  # possibile ciclo con varie keys
 
 
 def research_on_intelix(query, fromDate, toDate):
-    format = "%Y-%m-%d"
+    format = "%Y-%m-%d %H:%M:%S"
 
-    if (fromDate and toDate) is not None:
-        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format))  # aggiungere dei parametri
-    elif (fromDate and toDate) is None:
-        results = intelx.search(query)
+    if fromDate is not None and toDate is not None:
+        print("1")
+        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000)  # aggiungere dei parametri
+    elif fromDate is None and toDate is None:
+        print("2")
+        results = intelx.search(query, maxresults=1000000000)
     elif (fromDate is not None) and (toDate is None):
-        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=None)
+        print("3")
+        print(datetime.now().strftime(format))
+        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format), maxresults=1000000000)
     elif (fromDate is None) and (toDate is not None):
-        results = intelx.search(query, datefrom=None, dateto=toDate.strftime(format))
+        print("4")
+        fromD= datetime.fromtimestamp(0)
+        print(fromD.strftime(format))
+        results = intelx.search(query, datefrom= fromD.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000)
 
     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
@@ -53,11 +64,8 @@ def research_on_intelix(query, fromDate, toDate):
                 if key == 'query':
                     dizionario['query'] = query
                 elif key == 'date':
-                    print(record["date"])
                     datetime_object = parser.parse(record[key])
-                    print(datetime_object)
-                    dizionario[key] = datetime_object.timestamp()
-                    print(datetime_object.timestamp())
+                    dizionario[key] = regular_dot(datetime_object)
                 elif key == '_id':
                     dizionario['_id'] = uuid.uuid4().hex
                 else:
@@ -70,18 +78,22 @@ def research_on_intelix(query, fromDate, toDate):
         # print(nested)
         jstr = parse_json(jsonDict)
         # json.dumps(jsonDict, indent=4)
-        print(nested)
         # queryDict["query"] = domain
         # queryNested.append(queryDict)
         # queryDb(queryNested)
 
+        '''
         dict_response = {}
         dict_response["id"] = uuid.uuid4()
         dict_response["query"] = query
-        dict_response["timestamp"] = time.time()
+        dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
         dict_response["results"] = nested
+        
         # creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
         return dict_response, 200  # SearchScheduleResponseDTO
+        '''
+
+        return DTO_creation(query, nested)
 
     except Exception as e:
         error = {'Error': 'Internal Server Error'}
@@ -91,13 +103,15 @@ def research_on_intelix(query, fromDate, toDate):
 def research_on_intelix_query(query):
     format = "%Y-%m-%d"
 
-    results = intelx.search(query)  # aggiungere dei parametri
+    results = intelx.search(query,maxresults=1000000000)  # aggiungere dei parametri
     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []
     jsonDict = {}
     # queryNested = []
     # queryDict = {}
+
+
 
     datetime_str = "2022-12-13T00:24:30.98013Z"
 
@@ -109,7 +123,7 @@ def research_on_intelix_query(query):
                     dizionario['query'] = query
                 elif key == 'date':
                     datetime_object = parser.parse(record[key])
-                    dizionario[key] = datetime_object.timestamp()
+                    dizionario[key] = regular_dot(datetime_object)
                 elif key == '_id':
                     dizionario['_id'] = uuid.uuid4().hex
                 else:
@@ -119,7 +133,6 @@ def research_on_intelix_query(query):
             jsonDict[record["name"]] = dizionario
 
         print("******************************")
-        # print(nested)
         jstr = parse_json(jsonDict)
         # json.dumps(jsonDict, indent=4)
         # print(nested)
@@ -127,13 +140,17 @@ def research_on_intelix_query(query):
         # queryNested.append(queryDict)
         # queryDb(queryNested)
 
+        '''
         dict_response = {}
         dict_response["id"] = uuid.uuid4()
         dict_response["query"] = query
-        dict_response["timestamp"] = time.time()
+        dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
         dict_response["results"] = nested
         # creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
         return dict_response  # SearchScheduleResponseDTO
+        '''
+
+        return DTO_creation(query, nested)
 
     except Exception as e:
         error = {'Error': 'Internal Server Error'}
@@ -153,12 +170,9 @@ def parse_json(data):
     return json.loads(json_util.dumps(data))
 
 
-def tick():
-    print('Tick! The time is: %s' % datetime.now())
-
 
 def research_scheduler(query):
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(library_api.mongoHost)
 
     # Creazione del database   --- Cambiare nome alla collezione
     database = connessione["IntelX"]
@@ -172,13 +186,18 @@ def research_scheduler(query):
 
     if jstr != []:
 
+        '''
         dict_response = {}
         dict_response["id"] = uuid.uuid4()
         dict_response["query"] = query
-        dict_response["timestamp"] = time.time()
+        dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
         dict_response["results"] = research_on_db(query)
 
         return dict_response
+        '''
+
+        return DTO_creation(query, research_on_db(query))
+
     else:
         return create_scheduler(query)
 
@@ -317,18 +336,17 @@ def research_on_db_by_date(query, fromDate, toDate):
 
     results = {}
 
-    format = "%Y-%m-%d"
     criterio_query = {"query": query}
     criterio_fromDate = {"date": {'$gte': fromDate}}
     criterio_toDate = {"date": {'$lte': toDate}}
 
-    if (fromDate and toDate) is not None:
+    if fromDate is not None and toDate is not None:
         selezione = nuovacollection.find({'$and': [criterio_query, criterio_fromDate, criterio_toDate]})
-    elif (fromDate and toDate) is None:
+    elif fromDate is None and toDate is None:
         selezione = nuovacollection.find(criterio_query)
-    elif (fromDate is not None) and (toDate is None):
+    elif fromDate is not None and toDate is None:
         selezione = nuovacollection.find({'$and': [criterio_query, criterio_fromDate]})
-    elif (fromDate is None) and (toDate is not None):
+    elif fromDate is None and toDate is not None:
         selezione = nuovacollection.find({'$and': [criterio_query, criterio_toDate]})
 
     jstr = parse_json(selezione)  # return DTO
@@ -355,3 +373,19 @@ def create_db():
     jstr = parse_json(selezione)
 
     return jsonify(jstr)
+
+
+def regular_dot(datetime_object):
+    "regular expression per eliminare il punto dal timestamp"
+    date = re.search("\d+", str(datetime_object.timestamp()))
+    return int(date.group())
+
+
+def DTO_creation(query, list):
+    dict_response = {}
+    dict_response["id"] = uuid.uuid4()
+    dict_response["query"] = query
+    dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
+    dict_response["results"] = list
+
+    return dict_response

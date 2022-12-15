@@ -39,10 +39,11 @@ def drop_collection(query):
 
     # Creazione del database
     database = connessione["IntelX"]
-    nuovacollection = database["results"]
+    results_collection = database["results"]
+    schedulers_collection = database["schedulers"]
     # Rimuovere dati da una collection
     criterio = {"query": query}
-    nuovacollection.delete_many(criterio)
+    results_collection.delete_many(criterio)
+    schedulers_collection.delete_many(criterio)
 
-    for i in nuovacollection.find():
-        print(i)
+    return jsonify('Drop successfully!')

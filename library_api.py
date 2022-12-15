@@ -1,20 +1,69 @@
+from asyncio_mqtt import Client
+from cheroot import wsgi
 from intelxapi import intelx
 from datetime import datetime
 from flask import Flask, request
-from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date
+import re
+from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date, regular_dot
 from models import SearchCommand, SeachScheduleResponse, ScheduleCommand
 from mongo_class import drop_collection
 import time
 import uuid
+from flask_apscheduler import APScheduler
+from flask_mqtt import Mqtt
 
+
+
+
+
+
+
+basepath = "/unisannio/DWM/intelx"
 mqttBroker = "test.mosquitto.org"
+clientID = "Sub_test"
+topic = "unisannio/DWM/intelx/alert"
+updateIntervalSec = 5
+mongoHost = "mongodb://localhost:27017/"
+
+
+class Config:
+    SCHEDULER_API_ENABLED=True
+    MQTT_BROKER_URL = mqttBroker
+    MQTT_BROKER_PORT = 1883
+    MQTT_REFRESH_TIME = 1.0
+
+
+
+
+
 app = Flask(__name__)
+app.config.from_object(Config())
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+mqtt = Mqtt(app)
 
-intelx = intelx('3f2ef7d9-d6a2-4ce6-991e-254e2ae0d090')  # possibile ciclo con varie keys
 
-@app.get('/unisannio/DWM/intelx/searches')
+@mqtt.on_connect()
+def handle_connect(client, userdata, flags, rc):
+    print("Connesso")
+
+
+
+
+@scheduler.task('interval', id='scheduler_job', seconds=updateIntervalSec, misfire_grace_time=900)
+def job():
+    messaggio = "test message"
+
+    mqtt.publish(topic, messaggio, qos=1)
+    print("Done")
+
+
+intelx = intelx('6dc578ec-490b-49d5-8717-6379a2118895')  # possibile ciclo con varie keys
+
+
+@app.get(basepath+'/searches')
 def researchByDomain():
-
     """
         Endpoint Rest per la ricerca di un dominio mediante l'API di Intellix
 
@@ -22,7 +71,6 @@ def researchByDomain():
         :return: Lista contenete i dump in formato json
 
     """
-
 
     searchCommand = SearchCommand(request.json)
 
@@ -37,20 +85,23 @@ def researchByDomain():
     # se si li restituisco come SearchScheduleResponseDTO
     # altrimenti ricerca su intellix che restituisce come SearchScheduleResponseDTO MA NON SALVA SUL DB
 
-    print(query)
-    results = research_on_db_by_date(query, fromDate, toDate)
+    results = research_on_db_by_date(query, searchCommand.fromDate, searchCommand.toDate)
 
     if results != []:
 
         dict_response = {}
         dict_response["id"] = uuid.uuid4().hex
         dict_response["query"] = query
-        dict_response["timestamp"] = time.time()
+        dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
         dict_response["results"] = results
 
         return dict_response
     else:
-        return research_on_intelix(query,fromDate,toDate)
+        # print(fromDate)
+        format = "%Y-%m-%d"
+        # print(datetime.now().strftime(format))
+        # print(datetime.fromtimestamp(int(re.search("\d+", str(time.time())).group())).strftime(format))
+        return research_on_intelix(query, fromDate, toDate)
 
 
 '''
@@ -89,7 +140,7 @@ def stampaHTMLquery(query, maxResults):
 '''
 
 
-@app.route('/unisannio/DWM/intelx/schedulers', methods=['POST', 'DELETE'])
+@app.route(basepath+'/schedulers', methods=['POST', 'DELETE'])
 def schedulers():
     """
         Endpoint Rest per l'attivazione dell'alert per verificare la presenza di un nuovo dump
@@ -108,7 +159,6 @@ def schedulers():
         return drop_collection(query)
 
 
-
 '''
     #cosa ci passano?
     #query = request.form.args['query']
@@ -116,17 +166,17 @@ def schedulers():
     print(query)
     return research_alert(query)
 '''
-'''
+
 if __name__ == '__main__':
 
-    addr = '127.0.0.1', 5000
+    addr = '0.0.0.0', 5002
     server = wsgi.Server(addr, app)
     try:
         server.start()
     except KeyboardInterrupt:
         server.stop()
         print("-----------------Debug message: server stopped")
-'''
+
 '''
     try:
         scheduler = BackgroundScheduler()
