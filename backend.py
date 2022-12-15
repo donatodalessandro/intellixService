@@ -15,7 +15,7 @@ from dateutil import parser
 # Importazione del modulo di PyMongo
 import pymongo
 
-#mqttBroker ="mqtt.eclipseprojects.io"
+# mqttBroker ="mqtt.eclipseprojects.io"
 from models import SeachScheduleResponse
 from mongo_class import creazioneDB
 
@@ -24,17 +24,25 @@ app = Flask(__name__)
 
 intelx = intelx('bb54ee22-7c93-4d94-ad58-71d39a8dca32')  # possibile ciclo con varie keys
 
-def research_on_intelix(query,fromDate,toDate):
 
+def research_on_intelix(query, fromDate, toDate):
     format = "%Y-%m-%d"
 
-    results = intelx.search(query,datefrom=fromDate.strftime(format),dateto=toDate.strftime(format))     #aggiungere dei parametri
-    keys = ['_id','query', 'name', 'date', 'typeh', 'bucketh']
+    if (fromDate and toDate) is not None:
+        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format))  # aggiungere dei parametri
+    elif (fromDate and toDate) is None:
+        results = intelx.search(query)
+    elif (fromDate is not None) and (toDate is None):
+        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=None)
+    elif (fromDate is None) and (toDate is not None):
+        results = intelx.search(query, datefrom=None, dateto=toDate.strftime(format))
+
+    keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []
     jsonDict = {}
-    #queryNested = []
-    #queryDict = {}
+    # queryNested = []
+    # queryDict = {}
 
     datetime_str = "2022-12-13T00:24:30.98013Z"
 
@@ -45,48 +53,51 @@ def research_on_intelix(query,fromDate,toDate):
                 if key == 'query':
                     dizionario['query'] = query
                 elif key == 'date':
+                    print(record["date"])
                     datetime_object = parser.parse(record[key])
+                    print(datetime_object)
                     dizionario[key] = datetime_object.timestamp()
+                    print(datetime_object.timestamp())
                 elif key == '_id':
                     dizionario['_id'] = uuid.uuid4().hex
                 else:
                     dizionario[key] = record[key]
-            #print(dizionario)
+            # print(dizionario)
             nested.append(dizionario)
             jsonDict[record["name"]] = dizionario
 
         print("******************************")
-        #print(nested)
+        # print(nested)
         jstr = parse_json(jsonDict)
-        #json.dumps(jsonDict, indent=4)
+        # json.dumps(jsonDict, indent=4)
         print(nested)
-        #queryDict["query"] = domain
-        #queryNested.append(queryDict)
-        #queryDb(queryNested)
+        # queryDict["query"] = domain
+        # queryNested.append(queryDict)
+        # queryDb(queryNested)
 
         dict_response = {}
-        dict_response["id"]= uuid.uuid4()
+        dict_response["id"] = uuid.uuid4()
         dict_response["query"] = query
         dict_response["timestamp"] = time.time()
         dict_response["results"] = nested
-        #creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
-        return dict_response, 200           #SearchScheduleResponseDTO
+        # creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
+        return dict_response, 200  # SearchScheduleResponseDTO
 
     except Exception as e:
         error = {'Error': 'Internal Server Error'}
         return error, 500
+
 
 def research_on_intelix_query(query):
-
     format = "%Y-%m-%d"
 
-    results = intelx.search(query)     #aggiungere dei parametri
-    keys = ['_id','query', 'name', 'date', 'typeh', 'bucketh']
+    results = intelx.search(query)  # aggiungere dei parametri
+    keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []
     jsonDict = {}
-    #queryNested = []
-    #queryDict = {}
+    # queryNested = []
+    # queryDict = {}
 
     datetime_str = "2022-12-13T00:24:30.98013Z"
 
@@ -103,30 +114,31 @@ def research_on_intelix_query(query):
                     dizionario['_id'] = uuid.uuid4().hex
                 else:
                     dizionario[key] = record[key]
-            #print(dizionario)
+            # print(dizionario)
             nested.append(dizionario)
             jsonDict[record["name"]] = dizionario
 
         print("******************************")
-        #print(nested)
+        # print(nested)
         jstr = parse_json(jsonDict)
-        #json.dumps(jsonDict, indent=4)
-        #print(nested)
-        #queryDict["query"] = domain
-        #queryNested.append(queryDict)
-        #queryDb(queryNested)
+        # json.dumps(jsonDict, indent=4)
+        # print(nested)
+        # queryDict["query"] = domain
+        # queryNested.append(queryDict)
+        # queryDb(queryNested)
 
         dict_response = {}
-        dict_response["id"]= uuid.uuid4()
+        dict_response["id"] = uuid.uuid4()
         dict_response["query"] = query
         dict_response["timestamp"] = time.time()
         dict_response["results"] = nested
-        #creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
-        return dict_response           #SearchScheduleResponseDTO
+        # creazioneDB(nested)        #  la si aggiunge quando dobbiamo attivare lo scheduler
+        return dict_response  # SearchScheduleResponseDTO
 
     except Exception as e:
         error = {'Error': 'Internal Server Error'}
         return error, 500
+
 
 '''
 data = {"system_id": ,
@@ -136,14 +148,16 @@ data = {"system_id": ,
         }
 '''
 
+
 def parse_json(data):
     return json.loads(json_util.dumps(data))
+
 
 def tick():
     print('Tick! The time is: %s' % datetime.now())
 
-def research_scheduler(query):
 
+def research_scheduler(query):
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     # Creazione del database   --- Cambiare nome alla collezione
@@ -155,7 +169,6 @@ def research_scheduler(query):
     criterio = {"query": query}
     selezione = collection_schedulers.find(criterio)
     jstr = parse_json(selezione)
-
 
     if jstr != []:
 
@@ -169,13 +182,13 @@ def research_scheduler(query):
     else:
         return create_scheduler(query)
 
-def create_scheduler(query):
 
+def create_scheduler(query):
     return add_scheduler_to_db(query)
-    #publish_topic(query)
+    # publish_topic(query)
+
 
 def add_scheduler_to_db(query):
-
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
     # Creazione del database
     database = connessione["IntelX"]
@@ -196,7 +209,7 @@ def add_scheduler_to_db(query):
     dizionario["query"] = query
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
-    #print(result_dict["results"])
+    # print(result_dict["results"])
     results.insert_many(result_dict["results"])
 
     return result_dict
@@ -205,6 +218,7 @@ def add_scheduler_to_db(query):
 def publish_topic(topic):
     print("metodo publish")
     async_scheduler(topic)
+
 
 def async_scheduler(query):
     print("metodo async_scheduler")
@@ -223,8 +237,8 @@ def async_scheduler(query):
         print("-----------------Debug message: server stopped")
     '''
 
-def research_new_dump(query):
 
+def research_new_dump(query):
     print("metodo research dumps")
 
     dumps, status_code = stampaHTML(query["query"])
@@ -240,8 +254,8 @@ def research_new_dump(query):
         message = "Non sono presenti nuovi dumps"
         send_dumps(message)
 
-def send_dumps(result_query):
 
+def send_dumps(result_query):
     def on_publish(client, userdata, mid):
         print("Messaggio pubblicato")
 
@@ -253,7 +267,7 @@ def send_dumps(result_query):
     client.loop_stop()
     client.disconnect()
 
-    json_response = {"Valore" : "Funziona"}
+    json_response = {"Valore": "Funziona"}
     print("send dumps")
     return jsonify(json_response)
 
@@ -274,8 +288,9 @@ def research():
 
     return stampaHTMLquery(query, maxResults)
 '''
-def research_on_db(query):
 
+
+def research_on_db(query):
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     # Creazione del database
@@ -288,13 +303,42 @@ def research_on_db(query):
     criterio = {"query": query}
     selezione = nuovacollection.find(criterio)
 
-    jstr = parse_json(selezione)        #return DTO
+    jstr = parse_json(selezione)  # return DTO
+
+    return jstr
+
+
+def research_on_db_by_date(query, fromDate, toDate):
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # Creazione del database
+    database = connessione["IntelX"]
+    nuovacollection = database["results"]
+
+    results = {}
+
+    format = "%Y-%m-%d"
+    criterio_query = {"query": query}
+    criterio_fromDate = {"date": {'$gte': fromDate}}
+    criterio_toDate = {"date": {'$lte': toDate}}
+
+    if (fromDate and toDate) is not None:
+        selezione = nuovacollection.find({'$and': [criterio_query, criterio_fromDate, criterio_toDate]})
+    elif (fromDate and toDate) is None:
+        selezione = nuovacollection.find(criterio_query)
+    elif (fromDate is not None) and (toDate is None):
+        selezione = nuovacollection.find({'$and': [criterio_query, criterio_fromDate]})
+    elif (fromDate is None) and (toDate is not None):
+        selezione = nuovacollection.find({'$and': [criterio_query, criterio_toDate]})
+
+    jstr = parse_json(selezione)  # return DTO
+
+    print(selezione)
 
     return jstr
 
 
 def create_db():
-
     dict = research_on_intelix()
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
@@ -308,9 +352,6 @@ def create_db():
     criterio = {"query": query}
     selezione = nuovacollection.find(criterio)
 
-
     jstr = parse_json(selezione)
 
     return jsonify(jstr)
-
-

@@ -1,7 +1,7 @@
 from intelxapi import intelx
 from datetime import datetime
 from flask import Flask, request
-from backend import research_scheduler, research_on_intelix, research_on_db
+from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date
 from models import SearchCommand, SeachScheduleResponse, ScheduleCommand
 from mongo_class import drop_collection
 import time
@@ -38,10 +38,10 @@ def researchByDomain():
     # altrimenti ricerca su intellix che restituisce come SearchScheduleResponseDTO MA NON SALVA SUL DB
 
     print(query)
-    results = research_on_db(query)
+    results = research_on_db_by_date(query, fromDate, toDate)
 
     if results != []:
-        print("sono qui")
+
         dict_response = {}
         dict_response["id"] = uuid.uuid4().hex
         dict_response["query"] = query
