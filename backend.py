@@ -5,12 +5,12 @@ import re
 import time
 import uuid
 from itertools import count
-
+from flask_apscheduler import APScheduler
+from flask_mqtt import Mqtt
 from bson import json_util
 from intelxapi import intelx
 from flask import Flask, jsonify, request
 import json
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from paho.mqtt.client import Client
 from dateutil import parser
@@ -23,8 +23,28 @@ import library_api
 from models import SeachScheduleResponse
 from mongo_class import creazioneDB
 
+
+basepath = "/unisannio/DWM/intelx"
 mqttBroker = "test.mosquitto.org"
+clientID = "Sub_test"
+topic = "unisannio/DWM/intelx/alert"
+updateIntervalSec = 120
+mongoHost = "mongodb://localhost:27017/"
+
+
+class Config:
+    SCHEDULER_API_ENABLED=True
+    MQTT_BROKER_URL = mqttBroker
+    MQTT_BROKER_PORT = 1883
+    MQTT_REFRESH_TIME = 1.0
+
+
 app = Flask(__name__)
+app.config.from_object(Config())
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+mqtt = Mqtt(app)
 
 intelx = intelx('6dc578ec-490b-49d5-8717-6379a2118895')  # possibile ciclo con varie keys
 
@@ -33,17 +53,13 @@ def research_on_intelix(query, fromDate, toDate):
     format = "%Y-%m-%d %H:%M:%S"
 
     if fromDate is not None and toDate is not None:
-        print("1")
         results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000)  # aggiungere dei parametri
     elif fromDate is None and toDate is None:
-        print("2")
         results = intelx.search(query, maxresults=1000000000)
     elif (fromDate is not None) and (toDate is None):
-        print("3")
         print(datetime.now().strftime(format))
         results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format), maxresults=1000000000)
     elif (fromDate is None) and (toDate is not None):
-        print("4")
         fromD= datetime.fromtimestamp(0)
         print(fromD.strftime(format))
         results = intelx.search(query, datefrom= fromD.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000)
@@ -52,8 +68,6 @@ def research_on_intelix(query, fromDate, toDate):
 
     nested = []
     jsonDict = {}
-    # queryNested = []
-    # queryDict = {}
 
     datetime_str = "2022-12-13T00:24:30.98013Z"
 
@@ -110,8 +124,6 @@ def research_on_intelix_query(query):
     jsonDict = {}
     # queryNested = []
     # queryDict = {}
-
-
 
     datetime_str = "2022-12-13T00:24:30.98013Z"
 
@@ -214,24 +226,87 @@ def add_scheduler_to_db(query):
     results = database["results"]
     schedulers = database["schedulers"]
 
-    result_dict = research_on_intelix_query(query)
-    query_list = []
+    #scheduler deve essere creato
 
-    '''
-    # Estrazione dei documenti di una collection
-    for selezione in nuovacollection.find():
-        for elem in lista:
-            if elem['query'] == selezione['query']:
-                lista.remove(elem)
-    '''
+    query_list = []
     dizionario = {}
     dizionario["query"] = query
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
-    # print(result_dict["results"])
-    results.insert_many(result_dict["results"])
 
-    return result_dict
+    scheduler.add_job(query,lambda: research_intelix_scheduler(query))
+
+    return {}
+    # result_dict = research_on_intelix_query(query)
+    # query_list = []
+    #
+    # '''
+    # # Estrazione dei documenti di una collection
+    # for selezione in nuovacollection.find():
+    #     for elem in lista:
+    #         if elem['query'] == selezione['query']:
+    #             lista.remove(elem)
+    # '''
+    # dizionario = {}
+    # dizionario["query"] = query
+    # query_list.append(dizionario)
+    # schedulers.insert_many(query_list)
+    # # print(result_dict["results"])
+    # results.insert_many(result_dict["results"])
+    #
+    # return result_dict
+
+
+@scheduler.task('interval', id='scheduler_job', seconds=updateIntervalSec, misfire_grace_time=900)
+def job():
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    # Creazione del database
+    database = connessione["IntelX"]
+    results = database["results"]
+    schedulers = database["schedulers"].find()
+
+    try:
+        while True:
+            scheduler = schedulers.next()
+            research_intelix_scheduler(scheduler["query"])
+
+    except StopIteration:
+       print("fine")
+
+
+    # messaggio = "test message"
+    # mqtt.publish(topic, messaggio, qos=1)
+    print("Done")
+
+
+def research_intelix_scheduler(query) :
+    print("entrato nella funzione per la query "+query)
+    #deve andare sul db
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    # Creazione del database
+    database = connessione["IntelX"]
+    results = database["results"]
+    schedulers = database["schedulers"]
+
+    # filtrare per query
+    criterio = {"query": query}
+    # prendere i risultati per quella query
+    cursore = results.find(criterio)
+
+    #selezione = results.find(criterio).sort("date",-1)
+
+    try:
+        selezione = cursore.next()
+        print("Ricerca su intelix sull data "+ str(datetime.fromtimestamp(selezione["date"])) + "per la query "+ query)
+        dto = research_on_intelix(query, datetime.fromtimestamp(selezione["date"]), None)
+    except StopIteration:
+        dto = research_on_intelix_query(query)
+        print("Ricerca su intelix per la query " + query)
+
+    if len(dto["results"]) >0:
+        results.insert_many(dto["results"])
+
+    return {}
 
 
 def publish_topic(topic):

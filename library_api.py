@@ -2,20 +2,16 @@ from asyncio_mqtt import Client
 from cheroot import wsgi
 from intelxapi import intelx
 from datetime import datetime
+from markupsafe import escape
 from flask import Flask, request
 import re
-from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date, regular_dot
+from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date, regular_dot, DTO_creation
 from models import SearchCommand, SeachScheduleResponse, ScheduleCommand
 from mongo_class import drop_collection
 import time
 import uuid
 from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
-
-
-
-
-
 
 
 basepath = "/unisannio/DWM/intelx"
@@ -33,9 +29,6 @@ class Config:
     MQTT_REFRESH_TIME = 1.0
 
 
-
-
-
 app = Flask(__name__)
 app.config.from_object(Config())
 scheduler = APScheduler()
@@ -49,14 +42,6 @@ def handle_connect(client, userdata, flags, rc):
     print("Connesso")
 
 
-
-
-@scheduler.task('interval', id='scheduler_job', seconds=updateIntervalSec, misfire_grace_time=900)
-def job():
-    messaggio = "test message"
-
-    mqtt.publish(topic, messaggio, qos=1)
-    print("Done")
 
 
 intelx = intelx('6dc578ec-490b-49d5-8717-6379a2118895')  # possibile ciclo con varie keys
@@ -158,7 +143,12 @@ def schedulers():
     else:
         return drop_collection(query)
 
+@app.get(basepath+'/searches/<query>')
+def last_five_results_from_query(query):
 
+   return DTO_creation(query, research_on_db(query))
+
+    
 '''
     #cosa ci passano?
     #query = request.form.args['query']
