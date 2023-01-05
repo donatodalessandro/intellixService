@@ -1,18 +1,13 @@
-import os
-import random
-import string
 import re
 import time
 import uuid
-from itertools import count
 from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
 from bson import json_util
 from intelxapi import intelx
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 import json
 from datetime import datetime
-from paho.mqtt.client import Client
 from dateutil import parser
 
 # Importazione del modulo di PyMongo

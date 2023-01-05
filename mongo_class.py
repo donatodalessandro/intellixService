@@ -2,7 +2,7 @@ import os
 import time
 from bson import json_util
 from intelxapi import intelx
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 import json
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime

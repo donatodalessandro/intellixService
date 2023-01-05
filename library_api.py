@@ -1,14 +1,10 @@
-from asyncio_mqtt import Client
 from cheroot import wsgi
-from intelxapi import intelx
 from datetime import datetime
 from markupsafe import escape
 from flask import Flask, request
 import re
-
 import backend
-from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date, regular_dot, DTO_creation
-from models import SearchCommand, SeachScheduleResponse, ScheduleCommand, TokenCommand
+from models import SearchCommand, ScheduleCommand, TokenCommand
 from mongo_class import drop_collection
 import time
 import uuid
@@ -39,9 +35,6 @@ scheduler.start()
 mqtt = Mqtt(app)
 
 
-#intelx =
-
-
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     print("Connesso")
@@ -56,7 +49,7 @@ def set_token():
         return {"token": backend.get_token()}
 
 
-@app.get(basepath+'/searches')
+@app.post(basepath+'/searches')
 def researchByDomain():
 
     """
@@ -76,7 +69,7 @@ def researchByDomain():
     if searchCommand.fromDate is not None: fromDate = datetime.fromtimestamp(searchCommand.fromDate)
     if searchCommand.toDate is not None: toDate = datetime.fromtimestamp(searchCommand.toDate)
 
-    results = research_on_db_by_date(query, searchCommand.fromDate, searchCommand.toDate)
+    results = backend.research_on_db_by_date(query, searchCommand.fromDate, searchCommand.toDate)
 
     if results != []:
 
@@ -89,7 +82,7 @@ def researchByDomain():
         return dict_response
     else:
         format = "%Y-%m-%d"
-        return research_on_intelix(query, fromDate, toDate)
+        return backend.research_on_intelix(query, fromDate, toDate)
 
 @app.route(basepath+'/schedulers', methods=['POST', 'DELETE'])
 def schedulers():
@@ -104,18 +97,16 @@ def schedulers():
     query = scheduleCommand.query
 
     if request.method == 'POST':
-        return research_scheduler(query)
+        return backend.research_scheduler(query)
     else:
         return drop_collection(query)
 
 @app.get(basepath+'/searches/<query>')
 def last_five_results_from_query(query):
-
-   return DTO_creation(query, research_on_db(query))
+   return backend.DTO_creation(query, backend.research_on_db(query))
 
 
 if __name__ == '__main__':
-
     addr = '0.0.0.0', 5002
     server = wsgi.Server(addr, app)
     try:
