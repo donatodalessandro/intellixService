@@ -5,8 +5,10 @@ from datetime import datetime
 from markupsafe import escape
 from flask import Flask, request
 import re
+
+import backend
 from backend import research_scheduler, research_on_intelix, research_on_db, research_on_db_by_date, regular_dot, DTO_creation
-from models import SearchCommand, SeachScheduleResponse, ScheduleCommand
+from models import SearchCommand, SeachScheduleResponse, ScheduleCommand, TokenCommand
 from mongo_class import drop_collection
 import time
 import uuid
@@ -37,11 +39,22 @@ scheduler.start()
 mqtt = Mqtt(app)
 
 
-intelx = intelx('6dc578ec-490b-49d5-8717-6379a2118895')
+#intelx =
+
 
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     print("Connesso")
+
+@app.route(basepath+'/token', methods=['PUT','GET'])
+def set_token():
+    if request.method == 'PUT':
+        tokenCommand = TokenCommand(request.json)
+        backend.set_token(tokenCommand.token)
+        return {}
+    else:
+        return {"token": backend.get_token()}
+
 
 @app.get(basepath+'/searches')
 def researchByDomain():

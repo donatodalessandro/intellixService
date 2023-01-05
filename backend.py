@@ -37,7 +37,6 @@ class Config:
     MQTT_BROKER_PORT = 1883
     MQTT_REFRESH_TIME = 1.0
 
-
 app = Flask(__name__)
 app.config.from_object(Config())
 scheduler = APScheduler()
@@ -45,26 +44,72 @@ scheduler.init_app(app)
 scheduler.start()
 mqtt = Mqtt(app)
 
-intelx = intelx('bb54ee22-7c93-4d94-ad58-71d39a8dca32')  # possibile ciclo con varie keys
+def get_token_from_db():
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    database = connessione["IntelX"]
+    tokens = database["tokens"]
+
+    if tokens != []:
+
+        cursore = tokens.find()
+
+        try:
+            token = cursore.next()
+            return token["token"]
+
+        except StopIteration:
+            print("")
+    else:
+        return ""
+
+
+my_token = get_token_from_db()
+intelx_client = intelx(my_token)
+
+
+def add_token_on_db(token):
+
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    database = connessione["IntelX"]
+    tokens = database["tokens"]
+
+    tokens.delete_many({})
+    tokens.insert_one({"token": token})
+
+
+def set_token(token):
+
+    global intelx_client
+    intelx_client = intelx(token)
+    global my_token
+    my_token = token
+    add_token_on_db(token)
+
+def get_token():
+
+    global my_token
+
+    return my_token
+
 
 
 def research_on_intelix(query, fromDate, toDate):
     format = "%Y-%m-%d %H:%M:%S"
 
     if fromDate is not None and toDate is not None:
-        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format),
-                                maxresults=1000000000)  # aggiungere dei parametri
+        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format),
+                                       maxresults=1000000000)  # aggiungere dei parametri
     elif fromDate is None and toDate is None:
-        results = intelx.search(query, maxresults=1000000000)
+        results = intelx_client.search(query, maxresults=1000000000)
     elif (fromDate is not None) and (toDate is None):
         print(datetime.now().strftime(format))
-        results = intelx.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format),
-                                maxresults=1000000000)
+        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format),
+                                       maxresults=1000000000)
     elif (fromDate is None) and (toDate is not None):
         fromD = datetime.fromtimestamp(0)
         print(fromD.strftime(format))
-        results = intelx.search(query, datefrom=fromD.strftime(format), dateto=toDate.strftime(format),
-                                maxresults=1000000000)
+        results = intelx_client.search(query, datefrom=fromD.strftime(format), dateto=toDate.strftime(format),
+                                       maxresults=1000000000)
 
     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
@@ -104,7 +149,7 @@ def research_on_intelix(query, fromDate, toDate):
 def research_on_intelix_query(query):
     format = "%Y-%m-%d"
 
-    results = intelx.search(query, maxresults=1000000000)  # aggiungere dei parametri
+    results = intelx_client.search(query, maxresults=1000000000)  # aggiungere dei parametri
     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []

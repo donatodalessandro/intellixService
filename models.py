@@ -10,6 +10,9 @@ class SearchCommand(DTO):
     fromDate: Optional[int]
     toDate: Optional[int]
 
+class TokenCommand(DTO):
+    token: str
+
 class ResultIntelix(DTO):
     id: str
     name: str
