@@ -218,7 +218,7 @@ def add_scheduler_to_db(query):
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
 
-    scheduler.add_job(query, lambda: research_intelix_scheduler(query))
+    #scheduler.add_job(query, lambda: research_intelix_scheduler(query))
 
     return {}
 
@@ -290,6 +290,9 @@ def research_on_db(query):
     selezione = nuovacollection.find(criterio)
 
     jstr = parse_json(selezione)  # return DTO
+    
+    for elemento in jstr:
+        elemento["id"]=elemento["_id"]
 
     return jstr
 

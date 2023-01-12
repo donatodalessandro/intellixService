@@ -84,8 +84,8 @@ def researchByDomain():
         format = "%Y-%m-%d"
         return backend.research_on_intelix(query, fromDate, toDate)
 
-@app.route(basepath+'/schedulers', methods=['POST', 'DELETE'])
-def schedulers():
+@app.route(basepath+'/schedulers', methods=['POST'])
+def research_schedulers():
     """
         Endpoint Rest per l'attivazione dell'alert per verificare la presenza di un nuovo dump
 
@@ -95,13 +95,16 @@ def schedulers():
 
     scheduleCommand = ScheduleCommand(request.json)
     query = scheduleCommand.query
+    return backend.research_scheduler(query)
 
-    if request.method == 'POST':
-        return backend.research_scheduler(query)
-    else:
-        return drop_collection(query)
+@app.route(basepath+'/schedulers/<query>', methods=['DELETE'])
+def delete_schedulers(query):
+    return drop_collection(query)
+
+
 
 @app.get(basepath+'/searches/<query>')
+#non sono 5 ma sono tutti
 def last_five_results_from_query(query):
    return backend.DTO_creation(query, backend.research_on_db(query))
 
