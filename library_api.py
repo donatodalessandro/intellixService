@@ -53,7 +53,7 @@ def set_token():
 def researchByDomain():
 
     """
-        Endpoint Rest per la ricerca di un dominio mediante l'API di Intellix
+        Endpoint Rest per la ricerca di un dominio mediante l'API di Intelx
 
         :param domain: Il nome del dominio da cercare
         :return: Lista contenete i dump in formato json
@@ -82,7 +82,7 @@ def researchByDomain():
         return dict_response
     else:
         format = "%Y-%m-%d"
-        return backend.research_on_intelix(query, fromDate, toDate)
+        return backend.research_on_intelx(query, fromDate, toDate)
 
 @app.route(basepath+'/schedulers', methods=['POST'])
 def research_schedulers():
