@@ -5,7 +5,7 @@ from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
 from bson import json_util
 from intelxapi import intelx
-from flask import Flask
+from flask import jsonify
 import json
 from datetime import datetime
 from dateutil import parser
@@ -16,7 +16,27 @@ import pymongo
 from library_api import mqtt, scheduler
 
 
+def drop_collection(query):
+    """
+        Funzione per effettuare il drop della collezione sul db
 
+        :param query: nome della collezione da eliminare
+
+    """
+
+
+    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # Creazione del database
+    database = connessione["IntelX"]
+    results_collection = database["results"]
+    schedulers_collection = database["schedulers"]
+    # Rimuovere dati da una collection
+    criterio = {"query": query}
+    results_collection.delete_many(criterio)
+    schedulers_collection.delete_many(criterio)
+
+    return jsonify('Drop successfully!')
 
 def get_token_from_db():
     """
