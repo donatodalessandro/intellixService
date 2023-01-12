@@ -133,12 +133,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         server.stop()
         print("-----------------Debug message: server stopped")
-
-if __name__ == '__main__':
-    addr = '0.0.0.0', 5002
-    server = wsgi.Server(addr, app)
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        server.stop()
-        print("-----------------Debug message: server stopped")
