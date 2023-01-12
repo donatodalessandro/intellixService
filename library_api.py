@@ -53,7 +53,7 @@ def set_token():
 
 
 @app.post(config.basepath+'/searches')
-def research_By_domain():
+def research_by_domain():
 
     """
         Endpoint Rest per la ricerca di un dominio mediante l'API di Intelx
