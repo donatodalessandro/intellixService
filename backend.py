@@ -97,12 +97,10 @@ def research_on_intelix(query, fromDate, toDate):
     elif fromDate is None and toDate is None:
         results = intelx_client.search(query, maxresults=1000000000)
     elif (fromDate is not None) and (toDate is None):
-        print(datetime.now().strftime(format))
         results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format),
                                        maxresults=1000000000)
     elif (fromDate is None) and (toDate is not None):
         fromD = datetime.fromtimestamp(0)
-        print(fromD.strftime(format))
         results = intelx_client.search(query, datefrom=fromD.strftime(format), dateto=toDate.strftime(format),
                                        maxresults=1000000000)
 
@@ -235,10 +233,9 @@ def job():
         while True:
             scheduler = schedulers.next()
             id = research_intelix_scheduler(scheduler["query"])
-            id_json = json.dumps({"id": id})
-
-            mqtt.publish(scheduler["query"], id_json)
-
+            if id is not None:
+                id_json = json.dumps({"id": id})
+                mqtt.publish(scheduler["query"], id_json)
     except StopIteration:
         print("fine")
 
@@ -255,26 +252,29 @@ def research_intelix_scheduler(query):
     schedulers = database["schedulers"]
 
     criterio = {"query": query}
-    cursore = results.find(criterio)
+    cursore = results.find(criterio).sort('date',pymongo.DESCENDING)
+
 
     try:
         selezione = cursore.next()
+        timestamp = selezione["date"]+1 #Recupero dal secondo successivo per non avere se stesso
         print(
-            "Ricerca su intelix sull data " + str(datetime.fromtimestamp(selezione["date"])) + "per la query " + query)
-        dto = research_on_intelix(query, datetime.fromtimestamp(selezione["date"]), None)
+            "Ricerca su intelix sull data " + str(datetime.fromtimestamp(timestamp)) + " per la query " + query)
+        dto = research_on_intelix(query, datetime.fromtimestamp(timestamp), None)
     except StopIteration:
         dto = research_on_intelix_query(query)
         print("Ricerca su intelix per la query " + query)
 
+
     if len(dto["results"]) > 0:
         results.insert_many(dto["results"])
+        cursore = results.find(criterio).sort('date',pymongo.DESCENDING)
+        recente = cursore.next()
+        print(recente["_id"])
+        return recente["_id"]
+    else: return None
 
-    cursore = results.find(criterio)
-    recente = cursore.next()
-
-    print(recente["_id"])
-
-    return recente["_id"]
+    
 
 def research_on_db(query):
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -287,7 +287,7 @@ def research_on_db(query):
 
     # Limitare i risultati da estrarre
     criterio = {"query": query}
-    selezione = nuovacollection.find(criterio)
+    selezione = nuovacollection.find(criterio).sort('date',pymongo.DESCENDING)
 
     jstr = parse_json(selezione)  # return DTO
     
