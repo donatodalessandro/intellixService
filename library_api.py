@@ -29,10 +29,21 @@ mqtt = Mqtt(app)
 
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
+    """
+        Funzione di debug che permette di verificare l'effettiva connessione al broker mqtt
+
+    """
     print("Connesso")
 
 @app.route(config.basepath+'/token', methods=['PUT','GET'])
 def set_token():
+    """
+        Funzione che permette di settare il token mediante il metodo PUT o acquisirlo mediante il metodo GET
+
+        :return: in base al tipo di metodo Http il token verrà settato o ritornato come json
+
+    """
+
     if request.method == 'PUT':
         tokenCommand = TokenCommand(request.json)
         backend.set_token(tokenCommand.token)
@@ -42,7 +53,7 @@ def set_token():
 
 
 @app.post(config.basepath+'/searches')
-def researchByDomain():
+def research_By_domain():
 
     """
         Endpoint Rest per la ricerca di un dominio mediante l'API di Intelx
@@ -91,14 +102,37 @@ def research_schedulers():
 
 @app.route(config.basepath+'/schedulers/<query>', methods=['DELETE'])
 def delete_schedulers(query):
+    """
+        Funzione che permette di eliminare dalla collezione nel database lo scheduler associato alla query
+
+        :param query: scheduler da eliminare
+        :return:
+
+    """
     return drop_collection(query)
 
 
 
 @app.get(config.basepath+'/searches/<query>')
 def last_results_from_query(query):
-   return backend.DTO_creation(query, backend.research_on_db(query))
 
+    """
+        Funzione che ritorna i risultati della ricerca per query sul database
+
+        :return: DTO contenente i risultati della ricerca su db
+
+    """
+    return backend.DTO_creation(query, backend.research_on_db(query))
+
+
+if __name__ == '__main__':
+    addr = '0.0.0.0', 5002
+    server = wsgi.Server(addr, app)
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        server.stop()
+        print("-----------------Debug message: server stopped")
 
 if __name__ == '__main__':
     addr = '0.0.0.0', 5002
