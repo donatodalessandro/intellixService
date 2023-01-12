@@ -41,7 +41,7 @@ mqtt = Mqtt(app)
 
 def get_token_from_db():
     """
-        Funzione per il prelievo del Token Intellix dal database
+        Funzione per il prelievo del Token Intelx dal database
 
         :param
         :return: Token or empty string
@@ -88,7 +88,7 @@ def add_token_on_db(token):
 
 def set_token(token):
     """
-       Funzione per settare il valore del token da utilizzare per prelevare le informazioni da intellix
+       Funzione per settare il valore del token da utilizzare per prelevare le informazioni da intelx
 
        :param token: token da settare
        :return:
@@ -103,7 +103,7 @@ def set_token(token):
 
 def get_token():
     """
-        Funzione che restituisce il token utilizzato per la ricerca su intellix
+        Funzione che restituisce il token utilizzato per la ricerca su intelx
 
         :param
         :return my_token: token utilizzato per la ricerca
@@ -116,9 +116,9 @@ def get_token():
 
 
 
-def research_on_intelix(query, fromDate, toDate):
+def research_on_intelx(query, fromDate, toDate):
     """
-        Funzione che permette di effettuare una ricerca su intellix utilizzando una query e una data di inizio e di fine
+        Funzione che permette di effettuare una ricerca su intelx utilizzando una query e una data di inizio e di fine
 
         :param query, fromDate, toDate: query di ricerca, data di inizio, data di fine
         :return DTO_creation: DTO relativo ad una ricerca su intelx
@@ -175,9 +175,9 @@ def research_on_intelix(query, fromDate, toDate):
         return error, 500
 
 
-def research_on_intelix_query(query):
+def research_on_intelx_query(query):
     """
-       Funzione che permette di effettuare una ricerca su intellix utilizzando una query
+       Funzione che permette di effettuare una ricerca su intelx utilizzando una query
 
        :param query: query di ricerca
        :return DTO_creation: DTO relativo ad una ricerca su intelx
@@ -289,7 +289,7 @@ def add_scheduler_to_db(query):
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
 
-    #scheduler.add_job(query, lambda: research_intelix_scheduler(query))
+    #scheduler.add_job(query, lambda: research_intelx_scheduler(query))
 
     return {}
 
@@ -313,7 +313,7 @@ def job():
     try:
         while True:
             scheduler = schedulers.next()
-            id = research_intelix_scheduler(scheduler["query"])
+            id = research_intelx_scheduler(scheduler["query"])
             if id is not None:
                 query_json = json.dumps({"query": scheduler["query"], "id": id})
                 mqtt.publish(topic+scheduler["query"], query_json)
@@ -324,7 +324,7 @@ def job():
     print("Done")
 
 
-def research_intelix_scheduler(query):
+def research_intelx_scheduler(query):
 
 
     """
@@ -349,11 +349,11 @@ def research_intelix_scheduler(query):
         selezione = cursore.next()
         timestamp = selezione["date"]+1 #Recupero dal secondo successivo per non avere se stesso
         print(
-            "Ricerca su intelix sull data " + str(datetime.fromtimestamp(timestamp)) + " per la query " + query)
-        dto = research_on_intelix(query, datetime.fromtimestamp(timestamp), None)
+            "Ricerca su intelx sull data " + str(datetime.fromtimestamp(timestamp)) + " per la query " + query)
+        dto = research_on_intelx(query, datetime.fromtimestamp(timestamp), None)
     except StopIteration:
-        dto = research_on_intelix_query(query)
-        print("Ricerca su intelix per la query " + query)
+        dto = research_on_intelx_query(query)
+        print("Ricerca su intelx per la query " + query)
 
 
     if len(dto["results"]) > 0:
@@ -432,7 +432,7 @@ def research_on_db_by_date(query, fromDate, toDate):
 
 #
 # def create_db():
-#     dict = research_on_intelix()
+#     dict = research_on_intelx()
 #     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 #
 #     # Creazione del database
