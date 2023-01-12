@@ -11,25 +11,3 @@ class SearchCommand(DTO):
 
 class TokenCommand(DTO):
     token: str
-
-# class ResultIntelix(DTO):
-#     id: str
-#     name: str
-#     date: int
-#     typeh: str
-#     bucket: str
-
-
-# class SearchResult:
-#     id: str
-#     name: str
-#     date: int
-#     typeh: str
-#     bucket: str
-#
-#
-# class SeachScheduleResponse:
-#     id: str
-#     timestamp: int
-#     query: str
-#     result: list[SearchResult]
