@@ -104,8 +104,7 @@ def delete_schedulers(query):
 
 
 @app.get(basepath+'/searches/<query>')
-#non sono 5 ma sono tutti
-def last_five_results_from_query(query):
+def last_results_from_query(query):
    return backend.DTO_creation(query, backend.research_on_db(query))
 
 #
