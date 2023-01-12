@@ -40,6 +40,13 @@ scheduler.start()
 mqtt = Mqtt(app)
 
 def get_token_from_db():
+    """
+        Funzione per il prelievo del Token Intellix dal database
+
+        :param
+        :return: Token or empty string
+
+    """
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
     database = connessione["IntelX"]
     tokens = database["tokens"]
@@ -63,6 +70,13 @@ intelx_client = intelx(my_token)
 
 
 def add_token_on_db(token):
+    """
+        Funzione per l'aggiunta del token al database
+
+        :param token: token da aggiungere al database
+        :return:
+
+    """
 
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
     database = connessione["IntelX"]
@@ -73,6 +87,13 @@ def add_token_on_db(token):
 
 
 def set_token(token):
+    """
+       Funzione per settare il valore del token da utilizzare per prelevare le informazioni da intellix
+
+       :param token: token da settare
+       :return:
+
+   """
 
     global intelx_client
     intelx_client = intelx(token)
@@ -81,6 +102,13 @@ def set_token(token):
     add_token_on_db(token)
 
 def get_token():
+    """
+        Funzione che restituisce il token utilizzato per la ricerca su intellix
+
+        :param
+        :return my_token: token utilizzato per la ricerca
+
+    """
 
     global my_token
 
@@ -89,6 +117,14 @@ def get_token():
 
 
 def research_on_intelix(query, fromDate, toDate):
+    """
+        Funzione che permette di effettuare una ricerca su intellix utilizzando una query e una data di inizio e di fine
+
+        :param query, fromDate, toDate: query di ricerca, data di inizio, data di fine
+        :return DTO_creation: DTO relativo ad una ricerca su intelx
+
+    """
+
     format = "%Y-%m-%d %H:%M:%S"
 
     if fromDate is not None and toDate is not None:
@@ -140,6 +176,13 @@ def research_on_intelix(query, fromDate, toDate):
 
 
 def research_on_intelix_query(query):
+    """
+       Funzione che permette di effettuare una ricerca su intellix utilizzando una query
+
+       :param query: query di ricerca
+       :return DTO_creation: DTO relativo ad una ricerca su intelx
+
+    """
     format = "%Y-%m-%d"
 
     results = intelx_client.search(query, maxresults=1000000000)  # aggiungere dei parametri
@@ -177,10 +220,26 @@ def research_on_intelix_query(query):
 
 
 def parse_json(data):
+    """
+      Funzione per effettuare il parse in json
+
+      :param data: data da parsare
+      :return dato parsato
+
+   """
+
     return json.loads(json_util.dumps(data))
 
 
 def research_scheduler(query):
+    """
+       Funzione per ricercare la presenza di uno scheduler all'interno del database
+
+       :param query: scheduler da ricercare sul db
+       :return DTO, create_scheduler(query): DTO relativo alla ricerca per quella query, aggiunta del nuovo scheduler
+                                             sul db
+
+    """
     connessione = pymongo.MongoClient(library_api.mongoHost)
 
     database = connessione["IntelX"]
@@ -200,10 +259,24 @@ def research_scheduler(query):
 
 
 def create_scheduler(query):
+    """
+       Funzione di aggiunta dello scheduler al db
+
+       :param query: scheduler da aggiungere al db
+       :return
+
+    """
     return add_scheduler_to_db(query)
 
 
 def add_scheduler_to_db(query):
+    """
+      Funzione di aggiunta dello scheduler al db
+
+      :param query: scheduler da aggiungere al db
+      :return
+
+    """
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     database = connessione["IntelX"]
@@ -223,6 +296,14 @@ def add_scheduler_to_db(query):
 
 @scheduler.task('interval', id='scheduler_job', seconds=updateIntervalSec, misfire_grace_time=900)
 def job():
+    """
+      Funzione che viene richiamata ad intervallo prefissato che permette di andare a effettuare la ricerca su intelx
+      per quel determinato scheduler
+
+      :param
+      :return
+
+    """
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
     # Creazione del database
     database = connessione["IntelX"]
@@ -244,6 +325,15 @@ def job():
 
 
 def research_intelix_scheduler(query):
+
+
+    """
+      Funzione che permette di effettuare la ricerca su intelx utilizzando lo scheduler passato come argomento
+
+      :param query: scheduler per la ricerca su intelx
+      :return recente[_id]: ritorna la ricerca più recente per quello scheduler
+
+    """
     print("entrato nella funzione per la query " + query)
 
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -277,6 +367,14 @@ def research_intelix_scheduler(query):
     
 
 def research_on_db(query):
+
+    """
+      Funzione che permette di ricercare all'interno del db i risultati associati a quella query
+
+      :param query: query per la ricerca sul db
+      :return jstr: risultato associato alla query
+
+    """
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     # Creazione del database
@@ -298,6 +396,14 @@ def research_on_db(query):
 
 
 def research_on_db_by_date(query, fromDate, toDate):
+
+    """
+      Funzione che permette di ricercare all'interno del db per data
+
+      :param query, fromDate, toDate: query da ricercare, data di inizio, data di fine
+      :return jstr: risultato associato alla query
+
+    """
     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
 
     database = connessione["IntelX"]
@@ -324,33 +430,49 @@ def research_on_db_by_date(query, fromDate, toDate):
 
     return jstr
 
-
-def create_db():
-    dict = research_on_intelix()
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
-
-    # Creazione del database
-    database = connessione["IntelX"]
-    nuovacollection = database["results"]
-
-    results = {}
-
-    # Limitare i risultati da estrarre
-    criterio = {"query": query}
-    selezione = nuovacollection.find(criterio)
-
-    jstr = parse_json(selezione)
-
-    return jsonify(jstr)
+#
+# def create_db():
+#     dict = research_on_intelix()
+#     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+#
+#     # Creazione del database
+#     database = connessione["IntelX"]
+#     nuovacollection = database["results"]
+#
+#     results = {}
+#
+#     # Limitare i risultati da estrarre
+#     criterio = {"query": query}
+#     selezione = nuovacollection.find(criterio)
+#
+#     jstr = parse_json(selezione)
+#
+#     return jsonify(jstr)
 
 
 def regular_dot(datetime_object):
+
+    """
+      Funzione che permette di formattare la data secondo il formato utile alla visualizzazione
+
+      :param datetime_object: data da formattare
+      :return data: data formattata
+
+    """
     "regular expression per eliminare il punto dal timestamp"
     date = re.search("\d+", str(datetime_object.timestamp()))
     return int(date.group())
 
 
 def DTO_creation(query, list):
+
+    """
+      Funzione che permette di creare il DTO contenete le informazioni riguardanti la ricerca su intelx
+
+      :param query, list: query, lista dei risultati della ricerca
+      :return dict_response: dizionario contenente le informazioni riguardanti la ricerca su intelx
+
+    """
     dict_response = {}
     dict_response["id"] = uuid.uuid4()
     dict_response["query"] = query
