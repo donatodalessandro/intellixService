@@ -15,8 +15,7 @@ import pymongo
 
 # mqttBroker ="mqtt.eclipseprojects.io"
 import library_api
-from models import SeachScheduleResponse
-from mongo_class import creazioneDB
+
 
 basepath = "/unisannio/DWM/intelx"
 mqttBroker = "test.mosquitto.org"

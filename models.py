@@ -4,7 +4,6 @@ from py_dto import DTO
 class ScheduleCommand(DTO):
     query: str
 
-
 class SearchCommand(DTO):
     query: str
     fromDate: Optional[int]
@@ -13,24 +12,24 @@ class SearchCommand(DTO):
 class TokenCommand(DTO):
     token: str
 
-class ResultIntelix(DTO):
-    id: str
-    name: str
-    date: int
-    typeh: str
-    bucket: str
+# class ResultIntelix(DTO):
+#     id: str
+#     name: str
+#     date: int
+#     typeh: str
+#     bucket: str
 
 
-class SearchResult:
-    id: str
-    name: str
-    date: int
-    typeh: str
-    bucket: str
-
-
-class SeachScheduleResponse:
-    id: str
-    timestamp: int
-    query: str
-    result: list[SearchResult]
+# class SearchResult:
+#     id: str
+#     name: str
+#     date: int
+#     typeh: str
+#     bucket: str
+#
+#
+# class SeachScheduleResponse:
+#     id: str
+#     timestamp: int
+#     query: str
+#     result: list[SearchResult]
