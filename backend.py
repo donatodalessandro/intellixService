@@ -5,39 +5,18 @@ from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
 from bson import json_util
 from intelxapi import intelx
-from flask import Flask, jsonify
+from flask import Flask
 import json
 from datetime import datetime
 from dateutil import parser
+import config
 
 # Importazione del modulo di PyMongo
 import pymongo
-
-# mqttBroker ="mqtt.eclipseprojects.io"
-import library_api
-from models import SeachScheduleResponse
-from mongo_class import creazioneDB
-
-basepath = "/unisannio/DWM/intelx"
-mqttBroker = "test.mosquitto.org"
-clientID = "Sub_test"
-topic = "unisannio/DWM/intelx/alert/"
-updateIntervalSec = 35
-mongoHost = "mongodb://localhost:27017/"
+from library_api import mqtt, scheduler
 
 
-class Config:
-    SCHEDULER_API_ENABLED = True
-    MQTT_BROKER_URL = mqttBroker
-    MQTT_BROKER_PORT = 1883
-    MQTT_REFRESH_TIME = 1.0
 
-app = Flask(__name__)
-app.config.from_object(Config())
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
-mqtt = Mqtt(app)
 
 def get_token_from_db():
     """
@@ -47,7 +26,7 @@ def get_token_from_db():
         :return: Token or empty string
 
     """
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
     database = connessione["IntelX"]
     tokens = database["tokens"]
 
@@ -78,7 +57,7 @@ def add_token_on_db(token):
 
     """
 
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
     database = connessione["IntelX"]
     tokens = database["tokens"]
 
@@ -240,7 +219,7 @@ def research_scheduler(query):
                                              sul db
 
     """
-    connessione = pymongo.MongoClient(library_api.mongoHost)
+    connessione = pymongo.MongoClient(config.mongoHost)
 
     database = connessione["IntelX"]
     collection_results = database["results"]
@@ -277,7 +256,7 @@ def add_scheduler_to_db(query):
       :return
 
     """
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
 
     database = connessione["IntelX"]
     results = database["results"]
@@ -294,7 +273,7 @@ def add_scheduler_to_db(query):
     return {}
 
 
-@scheduler.task('interval', id='scheduler_job', seconds=updateIntervalSec, misfire_grace_time=900)
+@scheduler.task('interval', id='scheduler_job', seconds=config.updateIntervalSec, misfire_grace_time=900)
 def job():
     """
       Funzione che viene richiamata ad intervallo prefissato che permette di andare a effettuare la ricerca su intelx
@@ -304,7 +283,7 @@ def job():
       :return
 
     """
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
     # Creazione del database
     database = connessione["IntelX"]
     results = database["results"]
@@ -316,7 +295,7 @@ def job():
             id = research_intelx_scheduler(scheduler["query"])
             if id is not None:
                 query_json = json.dumps({"query": scheduler["query"], "id": id})
-                mqtt.publish(topic+scheduler["query"], query_json)
+                mqtt.publish(config.topic+scheduler["query"], query_json)
 
     except StopIteration:
         print("fine")
@@ -336,7 +315,7 @@ def research_intelx_scheduler(query):
     """
     print("entrato nella funzione per la query " + query)
 
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
     database = connessione["IntelX"]
     results = database["results"]
     schedulers = database["schedulers"]
@@ -375,7 +354,7 @@ def research_on_db(query):
       :return jstr: risultato associato alla query
 
     """
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
 
     # Creazione del database
     database = connessione["IntelX"]
@@ -404,7 +383,7 @@ def research_on_db_by_date(query, fromDate, toDate):
       :return jstr: risultato associato alla query
 
     """
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
+    connessione = pymongo.MongoClient(config.mongoHost)
 
     database = connessione["IntelX"]
     nuovacollection = database["results"]

@@ -1,6 +1,5 @@
 from cheroot import wsgi
 from datetime import datetime
-from markupsafe import escape
 from flask import Flask, request
 import re
 import backend
@@ -10,20 +9,13 @@ import time
 import uuid
 from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
-
-
-basepath = "/unisannio/DWM/intelx"
-mqttBroker = "test.mosquitto.org"
-clientID = "Sub_test"
-topic = "unisannio/DWM/intelx/alert"
-updateIntervalSec = 5
-mongoHost = "mongodb://localhost:27017/"
+import config
 
 
 class Config:
     SCHEDULER_API_ENABLED=True
-    MQTT_BROKER_URL = mqttBroker
-    MQTT_BROKER_PORT = 1883
+    MQTT_BROKER_URL = config.mqttBroker
+    MQTT_BROKER_PORT = config.mqttBrokerPort
     MQTT_REFRESH_TIME = 1.0
 
 
@@ -39,7 +31,7 @@ mqtt = Mqtt(app)
 def handle_connect(client, userdata, flags, rc):
     print("Connesso")
 
-@app.route(basepath+'/token', methods=['PUT','GET'])
+@app.route(config.basepath+'/token', methods=['PUT','GET'])
 def set_token():
     if request.method == 'PUT':
         tokenCommand = TokenCommand(request.json)
@@ -49,7 +41,7 @@ def set_token():
         return {"token": backend.get_token()}
 
 
-@app.post(basepath+'/searches')
+@app.post(config.basepath+'/searches')
 def researchByDomain():
 
     """
@@ -84,7 +76,7 @@ def researchByDomain():
         format = "%Y-%m-%d"
         return backend.research_on_intelx(query, fromDate, toDate)
 
-@app.route(basepath+'/schedulers', methods=['POST'])
+@app.route(config.basepath+'/schedulers', methods=['POST'])
 def research_schedulers():
     """
         Endpoint Rest per l'attivazione dell'alert per verificare la presenza di un nuovo dump
@@ -97,22 +89,22 @@ def research_schedulers():
     query = scheduleCommand.query
     return backend.research_scheduler(query)
 
-@app.route(basepath+'/schedulers/<query>', methods=['DELETE'])
+@app.route(config.basepath+'/schedulers/<query>', methods=['DELETE'])
 def delete_schedulers(query):
     return drop_collection(query)
 
 
 
-@app.get(basepath+'/searches/<query>')
+@app.get(config.basepath+'/searches/<query>')
 def last_results_from_query(query):
    return backend.DTO_creation(query, backend.research_on_db(query))
 
-#
-# if __name__ == '__main__':
-#     addr = '0.0.0.0', 5002
-#     server = wsgi.Server(addr, app)
-#     try:
-#         server.start()
-#     except KeyboardInterrupt:
-#         server.stop()
-#         print("-----------------Debug message: server stopped")
+
+if __name__ == '__main__':
+    addr = '0.0.0.0', 5002
+    server = wsgi.Server(addr, app)
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        server.stop()
+        print("-----------------Debug message: server stopped")
