@@ -6,8 +6,6 @@ import backend
 from models import SearchCommand, ScheduleCommand, TokenCommand
 import time
 import uuid
-from flask_apscheduler import APScheduler
-from flask_mqtt import Mqtt
 import config
 
 
@@ -20,19 +18,7 @@ class Config:
 
 app = Flask(__name__)
 app.config.from_object(Config())
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
-mqtt = Mqtt(app)
 
-
-@mqtt.on_connect()
-def handle_connect(client, userdata, flags, rc):
-    """
-        Funzione di debug che permette di verificare l'effettiva connessione al broker mqtt
-
-    """
-    print("Connesso")
 
 @app.route(config.basepath+'/token', methods=['PUT','GET'])
 def set_token():
@@ -129,6 +115,7 @@ if __name__ == '__main__':
     server = wsgi.Server(addr, app)
     try:
         server.start()
+    
     except KeyboardInterrupt:
         server.stop()
         print("-----------------Debug message: server stopped")
