@@ -5,7 +5,6 @@ from flask_apscheduler import APScheduler
 from flask_mqtt import Mqtt
 from bson import json_util
 from intelxapi import intelx
-from flask import jsonify
 import json
 from datetime import datetime
 from dateutil import parser
@@ -26,7 +25,6 @@ scheduler.start()
 def handle_connect(client, userdata, flags, rc):
     """
         Funzione di debug che permette di verificare l'effettiva connessione al broker mqtt
-
     """
     if rc == 0:
        print('Connected successfully to MQTT')
@@ -37,14 +35,9 @@ def handle_connect(client, userdata, flags, rc):
 def drop_collection(query):
     """
         Funzione per effettuare il drop della collezione sul db
-
         :param query: nome della collezione da eliminare
-
     """
-
-
-    connessione = pymongo.MongoClient("mongodb://localhost:27017/")
-
+    connessione = pymongo.MongoClient(config.mongoHost)
     # Creazione del database
     database = connessione["IntelX"]
     results_collection = database["results"]
@@ -53,13 +46,15 @@ def drop_collection(query):
     criterio = {"query": query}
     results_collection.delete_many(criterio)
     schedulers_collection.delete_many(criterio)
-
-    return jsonify('Drop successfully!')
+    print("Scheduler per "+query+" eliminato")
+    dict_response = {}
+    dict_response["message"] = "Scheduler per "+query+" eliminato"
+    connessione.close()
+    return dict_response
 
 def get_token_from_db():
     """
         Funzione per il prelievo del Token Intelx dal database
-
         :param
         :return: Token or empty string
 
@@ -121,14 +116,11 @@ def set_token(token):
 def get_token():
     """
         Funzione che restituisce il token utilizzato per la ricerca su intelx
-
         :param
         :return my_token: token utilizzato per la ricerca
 
     """
-
     global my_token
-
     return my_token
 
 
@@ -144,29 +136,21 @@ def research_on_intelx(query, fromDate, toDate, sorter=2):
 
     format = "%Y-%m-%d %H:%M:%S"
 
-
-
-  
-
     if fromDate is not None and toDate is not None:
-        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format),
-                                    maxresults=1000000000)  # aggiungere dei parametri
+        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000, media=24)  # aggiungere dei parametri
     elif fromDate is None and toDate is None:
-        results = intelx_client.search(query, maxresults=1000000000, sort=sorter)
+        results = intelx_client.search(query, maxresults=1000000000, sort=sorter, media=24)
     elif (fromDate is not None) and (toDate is None):
         print("Ricerca da "+fromDate.strftime(format)+" a "+datetime.now().strftime(format))
-        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format), maxresults=1000000000)
+        results = intelx_client.search(query, datefrom=fromDate.strftime(format), dateto=datetime.now().strftime(format), maxresults=1000000000, media=24)
     elif (fromDate is None) and (toDate is not None):
         fromD = datetime.fromtimestamp(0)
-        results = intelx_client.search(query, datefrom=fromD.strftime(format), dateto=toDate.strftime(format),
-                                    maxresults=1000000000)
+        results = intelx_client.search(query, datefrom=fromD.strftime(format), dateto=toDate.strftime(format), maxresults=1000000000, media=24)
 
 
     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
 
     nested = []
-    jsonDict = {}
-
 
     try:
         for record in results["records"]:
@@ -181,63 +165,19 @@ def research_on_intelx(query, fromDate, toDate, sorter=2):
                     dizionario['_id'] = uuid.uuid4().hex
                 else:
                     dizionario[key] = record[key]
+            
 
-            nested.append(dizionario)
-            jsonDict[record["name"]] = dizionario
+            if  dizionario["date"]<int(datetime.now().timestamp()): 
+                nested.append(dizionario)         
 
         print("******************************")
-
-        jstr = parse_json(jsonDict)
 
         return DTO_creation(query, nested)
 
     except Exception as e:
+        print(e)
         error = {'Error': 'Internal Server Error'}
         return error, 500
-
-
-# def research_on_intelx_query(query):
-#     """
-#        Funzione che permette di effettuare una ricerca su intelx utilizzando una query
-
-#        :param query: query di ricerca
-#        :return DTO_creation: DTO relativo ad una ricerca su intelx
-
-#     """
-#     format = "%Y-%m-%d"
-
-#     results = intelx_client.search(query, maxresults=1000000000)  # aggiungere dei parametri
-#     keys = ['_id', 'query', 'name', 'date', 'typeh', 'bucketh']
-
-#     nested = []
-#     jsonDict = {}
-
-#     datetime_str = "2022-12-13T00:24:30.98013Z"
-
-#     try:
-#         for record in results["records"]:
-#             dizionario = {}
-#             for key in keys:
-#                 if key == 'query':
-#                     dizionario['query'] = query
-#                 elif key == 'date':
-#                     datetime_object = parser.parse(record[key])
-#                     dizionario[key] = regular_dot(datetime_object)
-#                 elif key == '_id':
-#                     dizionario['_id'] = uuid.uuid4().hex
-#                 else:
-#                     dizionario[key] = record[key]
-#             nested.append(dizionario)
-#             jsonDict[record["name"]] = dizionario
-
-#         print("******************************")
-#         jstr = parse_json(jsonDict)
-
-#         return DTO_creation(query, nested)
-
-#     except Exception as e:
-#         error = {'Error': 'Internal Server Error'}
-#         return error, 500
 
 
 def parse_json(data):
@@ -310,8 +250,6 @@ def add_scheduler_to_db(query):
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
 
-    #scheduler.add_job(query, lambda: research_intelx_scheduler(query))
-
     return {}
 
 
@@ -332,6 +270,7 @@ def job():
     schedulers = database["schedulers"].find()
 
     try:
+        print("Inizio iterazione delle query registrate")
         while True:
             scheduler = schedulers.next()
             id = research_intelx_scheduler(scheduler["query"])
@@ -339,12 +278,12 @@ def job():
                 query_json = json.dumps({"query": scheduler["query"], "id": id})
                 print("Invio alert su MQTT")
                 result = mqtt.publish(config.topic+scheduler["query"], query_json)
-                print(result)
-
+                if result[0] == 0 : 
+                    print("Messaggio inviato")
+                else:
+                    print("Non connesso a MQTT")
     except StopIteration:
-        print("fine")
-
-    print("Done")
+        print("Fine iterazione")
 
 
 def research_intelx_scheduler(query):
@@ -357,7 +296,7 @@ def research_intelx_scheduler(query):
       :return recente[_id]: ritorna la ricerca più recente per quello scheduler
 
     """
-    print("entrato nella funzione per la query " + query)
+    print("Entrato nella funzione per la query " + query)
 
     connessione = pymongo.MongoClient(config.mongoHost)
     database = connessione["IntelX"]
@@ -377,8 +316,7 @@ def research_intelx_scheduler(query):
     except StopIteration:
         dto = research_on_intelx(query, None, None, sorter=4)
         print("Ricerca su intelx per la query " + query)
-
-    print(len(dto["results"]))
+    
 
 
     if len(dto["results"]) > 0:
@@ -387,7 +325,9 @@ def research_intelx_scheduler(query):
         recente = cursore.next()
         print(recente["_id"])
         return recente["_id"]
-    else: return None
+    else: 
+        print("Nessun nuovo risultato trovato")
+        return None
 
     
 
@@ -434,8 +374,6 @@ def research_on_db_by_date(query, fromDate, toDate):
     database = connessione["IntelX"]
     nuovacollection = database["results"]
 
-    results = {}
-
     criterio_query = {"query": query}
     criterio_fromDate = {"date": {'$gte': fromDate}}
     criterio_toDate = {"date": {'$lte': toDate}}
@@ -449,30 +387,8 @@ def research_on_db_by_date(query, fromDate, toDate):
     elif fromDate is None and toDate is not None:
         selezione = nuovacollection.find({'$and': [criterio_query, criterio_toDate]})
 
-    jstr = parse_json(selezione)  # return DTO
-
-    print(selezione)
-
+    jstr = parse_json(selezione.sort('date',pymongo.DESCENDING))  # return DTO
     return jstr
-
-#
-# def create_db():
-#     dict = research_on_intelx()
-#     connessione = pymongo.MongoClient("mongodb://localhost:27017/")
-#
-#     # Creazione del database
-#     database = connessione["IntelX"]
-#     nuovacollection = database["results"]
-#
-#     results = {}
-#
-#     # Limitare i risultati da estrarre
-#     criterio = {"query": query}
-#     selezione = nuovacollection.find(criterio)
-#
-#     jstr = parse_json(selezione)
-#
-#     return jsonify(jstr)
 
 
 def regular_dot(datetime_object):
@@ -498,10 +414,10 @@ def DTO_creation(query, list):
       :return dict_response: dizionario contenente le informazioni riguardanti la ricerca su intelx
 
     """
+
     dict_response = {}
     dict_response["id"] = uuid.uuid4()
     dict_response["query"] = query
     dict_response["timestamp"] = int(re.search("\d+", str(time.time())).group())
     dict_response["results"] = list
-
     return dict_response
