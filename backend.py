@@ -309,7 +309,7 @@ def research_intelx_scheduler(query):
         results.insert_many(dto["results"])
         cursore = results.find(criterio).sort('date',pymongo.DESCENDING)
         recente = cursore.next()
-        print("Trovato/i "+len(dto["results"])+ " nuovi dump. Il più recente ha id: "+recente["_id"])
+        print("Trovato/i "+str(len(dto["results"]))+ " nuovi dump. Il più recente ha id: "+recente["_id"])
         return recente["_id"]
     else: 
         print("Nessun nuovo risultato trovato")
