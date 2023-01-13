@@ -212,23 +212,12 @@ def research_scheduler(query):
     jstr = parse_json(selezione)
 
     if jstr != []:
-
+        print("Esiste già uno scheduler per la query "+query)
         return DTO_creation(query, research_on_db(query))
 
     else:
-        return create_scheduler(query)
-
-
-def create_scheduler(query):
-    """
-       Funzione di aggiunta dello scheduler al db
-
-       :param query: scheduler da aggiungere al db
-       :return
-
-    """
-    return add_scheduler_to_db(query)
-
+        print("Creazione scheduler per la query "+query)
+        return add_scheduler_to_db(query)
 
 def add_scheduler_to_db(query):
     """
@@ -249,7 +238,7 @@ def add_scheduler_to_db(query):
     dizionario["query"] = query
     query_list.append(dizionario)
     schedulers.insert_many(query_list)
-
+    print("Scheduler aggiunto al database per la query "+query)
     return {}
 
 
