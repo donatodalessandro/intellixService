@@ -4,7 +4,6 @@ from flask import Flask, request
 import re
 import backend
 from models import SearchCommand, ScheduleCommand, TokenCommand
-from mongo_class import drop_collection
 import time
 import uuid
 from flask_apscheduler import APScheduler
@@ -109,7 +108,7 @@ def delete_schedulers(query):
         :return:
 
     """
-    return drop_collection(query)
+    return backend.drop_collection(query)
 
 
 
