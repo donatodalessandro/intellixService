@@ -169,9 +169,6 @@ def research_on_intelx(query, fromDate, toDate, sorter=2):
 
             if  dizionario["date"]<int(datetime.now().timestamp()): 
                 nested.append(dizionario)         
-
-        print("******************************")
-
         return DTO_creation(query, nested)
 
     except Exception as e:
